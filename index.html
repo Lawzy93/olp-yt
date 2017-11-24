@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OpenLP YouTube Plugin MockUp</title>
+    <meta name="description" content="A mockup for a Youtbe Plugin which handles pre-beffering and display of YouTube clips for OpenLP" />
+    <meta name="author" content="Michael Laws (lawzy93)" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+    <style> 
+      html, body {height: 100%}
+      .lib-gradient {
+        background: -webkit-linear-gradient(#f1f1f1, #9e9e9e); /* For Safari 5.1 to 6.0 */
+        background: -o-linear-gradient(#f1f1f1, #9e9e9e); /* For Opera 11.1 to 12.0 */
+        background: -moz-linear-gradient(#f1f1f1, #9e9e9e); /* For Firefox 3.6 to 15 */
+        background: linear-gradient(#f1f1f1, #9e9e9e); /* Standard syntax */
+      }
+    </style>
+    <script>
+      'use strict';
+      class YTPlayer {
+        // building_player = false;
+        constructor(index, id, title) {
+          this.index = index;
+          this.id = id;
+          this.title = title;
+          this.loaded = false;
+          this.timer = null;
+
+          this.div_service_item = document.createElement('div');
+          this.div_service_item.className = 'w3-block w3-display-container';
+          this.div_service_item.innerHTML = '&nbsp;';
+            this.div_service_item_progress = document.createElement('div');
+            this.div_service_item_progress.className = 'w3-light-green w3-display-topleft';
+          this.div_service_item.appendChild(this.div_service_item_progress);
+            this.div_service_item_title = document.createElement('div');
+            this.div_service_item_title.className = 'w3-display-left';
+            this.div_service_item_title.innerText = (this.title.length > 30) ? this.title.substring(0, 29) + '...' : this.title;
+          this.div_service_item.appendChild(this.div_service_item_title);
+            this.div_service_item_logo = document.createElement('div');
+            this.div_service_item_logo.className = 'w3-display-right';
+          this.div_service_item.appendChild(this.div_service_item_logo);
+            this.div_service_item_clickable = document.createElement('div');
+            this.div_service_item_clickable.className = 'w3-display-topleft';
+            this.div_service_item_clickable.style = 'width: 100%; height: 100%;';
+            this.div_service_item_clickable.setAttribute('onclick', 'service_items[' + this.index + '].service_select();');
+            this.div_service_item_clickable.setAttribute('ondblclick', 'service_items[' + this.index + '].play();');
+          this.div_service_item.appendChild(this.div_service_item_clickable);
+          document.getElementById('service_order').appendChild(this.div_service_item);
+
+          this.div_player = document.createElement('div');
+          this.div_player.id = 'player_' + this.index;
+          this.div_player.setAttribute('data-index', this.index);
+          this.div_player.style = "display: none;";
+          document.getElementById('screen').appendChild(this.div_player);
+
+          this.player = new YT.Player('player_' + this.index, {
+            height: '90%',
+            width: '60%',
+            videoId: this.id,
+            playerVars: {
+              autoplay: 1,
+              controls: 0,
+              disablekb: 1,
+              fs: 0,
+              iv_load_policy: 3,
+              modestbranding: 1,
+              rel: 0,
+              showinfo: 0
+            },
+            events: {
+              'onReady': function(e) {
+                let index = e.target.a.dataset.index;
+                service_items[index].onReady(e);
+              },
+              'onStateChange': function(e) {
+                let index = e.target.a.dataset.index;
+                service_items[index].onStateChange(e);
+              }
+            }
+          });
+        }
+
+        onReady (e) {
+          building_player = false;
+          this.div_player = document.getElementById('player_' + this.index);
+          this.player.mute();
+          this.updateLoaded();
+          // this.player.playVideo();
+        }
+
+        onStateChange (e) {
+          if (e.data == YT.PlayerState.PLAYING && !this.loaded) {
+            this.updateLoaded();
+          }
+
+          if (e.data == YT.PlayerState.PLAYING && this.loaded) {
+            if (playing != null && playing != this.index) {
+              service_items[playing].stop();
+            }
+            playing = this.index;
+            this.div_player.style = 'display: block;';
+            this.player.unMute();
+          }
+
+          if (e.data == YT.PlayerState.ENDED) {
+            this.stop();
+          }
+
+          if (e.data == -1) {
+            clearTimeout(this.timer);
+            this.div_service_item_logo.innerHTML = '<i class="fa fa-exclamation-triangle"></i>';
+          }
+        }
+
+        updateLoaded () {
+          let status = this.player.getVideoLoadedFraction();
+          this.div_service_item_progress.style =  'height: 100%; width: ' + Math.floor(status*100) + '%;';          
+          if (status == 1) {
+            this.loaded = true;
+            this.div_service_item_logo.innerHTML = '<i class="fa fa-check-square"></i>';
+            this.player.pauseVideo();
+            this.player.seekTo(0, true);
+          } else {
+            this.div_service_item_logo.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+            this.timer = setTimeout(this.updateLoaded.bind(this), 3*1000);
+          }
+        }
+
+        play () {
+          this.player.playVideo();
+        }
+
+        stop () {
+          playing = null;
+          this.div_player.style = "display: none;";
+          this.player.pauseVideo();
+          this.player.seekTo(0, true);
+        }
+
+        service_select () {
+          if (selected_service != null) {
+            service_items[selected_service].unselect();
+          }
+          this.select();
+          selected_service = this.index;
+        }
+
+        select () {
+          this.div_service_item.className = 'w3-block w3-display-container w3-light-blue';
+          this.div_service_item_progress.className = 'w3-blue w3-display-topleft';
+        }
+
+        unselect () {
+          this.div_service_item.className = 'w3-block w3-display-container';
+          this.div_service_item_progress.className = 'w3-light-green w3-display-topleft';
+        }
+
+        // this.delete = function() {
+
+        // }
+
+        // this.moveUp = function() {
+
+        // }
+
+        // this.moveDown = function() {
+
+        // }
+
+        // this.moveTop = function() {
+
+        // }
+
+        // this.moveBottom = function() {
+
+        // }
+      }
+
+    </script>
+
+    <script>
+      let api_ready = false;
+      let building_player = false;
+      let service_items = [], search_itmes = [];
+      let selected_service = null, selected_search = '', playing = null;
+      let api_key = ""; // ADD API KEY HERE
+
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+      function onYouTubeIframeAPIReady() {
+        api_ready = true;
+      }
+
+      function searchRun() {
+        let q = document.getElementById('yt_lib_search_input').value;
+        let url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q=' + q + '&type=video&videoEmbeddable=true&fields=items(id%2FvideoId%2Csnippet(channelTitle%2Cthumbnails%2Fdefault%2Furl%2Ctitle))&key=' + api_key;
+
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function() {
+          if (this.readyState == 4 && this.status == 200) {
+            let res = JSON.parse(xhttp.responseText);
+            let yt_lib_results = document.getElementById('yt_lib_results');
+            yt_lib_results.innerHTML = '';
+            for (i in res.items) {
+              let video = res.items[i];
+              let html = '';
+              html += '<div id="search_'+i+'" data-videoid="'+video.id.videoId+'" data-title="'+ video.snippet.title +' "onclick="search_select(\''+i+'\');" ondblclick="addToService(\''+i+'\')">';
+              html += '<img style="float: left; width: 33%;" src="' + video.snippet.thumbnails.default.url + '" />';
+              html += '<p><b>' + video.snippet.title + '</b></p>';
+              html += '<p>' + video.snippet.channelTitle + '</p>';
+              html += '</div>';
+              yt_lib_results.innerHTML += html;
+            }
+          }
+        };
+
+        xhttp.open("GET", url, true);
+        xhttp.send();
+      }
+
+      function addToService(index) {
+        let item = document.getElementById('search_' + index);
+        console.log(service_items.length, item.dataset.videoid, item.dataset.title);
+        service_items.push(new YTPlayer(service_items.length, item.dataset.videoid, item.dataset.title));
+      }
+
+      function search_select(i) {
+        let clicked = document.getElementById('search_'+i);
+        if (selected_search != '') {
+          let unselect = document.getElementById('search_'+selected_search);
+          unselect.className = '';
+        }
+        clicked.className = 'w3-light-blue';
+        selected_search = i;
+
+      }
+
+    </script>
+  </head>
+
+  <body>
+    <!-- LIBRARY BLOCK -->
+    <div class="w3-sidebar w3-bar-block w3-light-grey" style="width: 20%;">
+      <div class="w3-block w3-border w3-small">
+        Library
+        <div class="w3-right">&times;</div>
+      </div>
+      <div class="w3-block lib-gradient">
+        <img class="w3-image" src="images/plugin_songs.png" style="width: 7%;" />
+        Songs
+      </div>
+      <div class="w3-block lib-gradient">
+        <img class="w3-image" src="images/plugin_bibles.png" style="width: 7%;" />
+        Bibles
+      </div>
+      <div class="w3-block lib-gradient">
+        <img class="w3-image" src="images/plugin_media.png" style="width: 7%;" />
+        Media
+      </div>
+      <div class="w3-block lib-gradient" onclick=""> <!-- onclic to hide/show yt_lib -->
+        <img class="w3-image" src="images/yt_icon_rgb.png" style="width: 7%;" />
+        YouTube
+      </div>
+      <div id="yt_lib">
+        <div id="yt_lib_menu">
+          <!-- <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/new.png" style="width: 100%" /></button>
+          <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/live.png" style="width: 100%" /></button> -->
+          <button class="w3-button w3-hover-light-blue" onclick="addToService(selected_search);"><img class="w3-image" src="images/add.png" style="width: 100%" /></button>
+        </div>
+        <div id="yt_lib_search" class="w3-container">
+          <input id="yt_lib_search_input" class="w3-input w3-border w3-block" type="text" placeholder="Search YouTube..."></input>
+          <script>
+            document.getElementById('yt_lib_search_input').addEventListener("keyup", function(event) {
+              event.preventDefault();
+              if (event.keyCode === 13) {
+                searchRun();
+              }
+            });
+          </script>
+          <button class="w3-button w3-hover-light-blue w3-right" onclick="searchRun()">Search</button>
+          <button class="w3-button w3-hover-grey w3-opacity-min w3-right" onclick=""><img class="w3-image" src="images/unlock.png" style="width: 100%;" /></button>
+        </div>
+        <div id="yt_lib_results" class="w3-white w3-border">No Search Results</div>
+      </div>
+    </div>
+
+    <!-- SERVICE BLOCK -->
+    <div class="w3-sidebar w3-bar-block w3-light-grey" style="width: 20%; right: 0;">
+      <div class="w3-block w3-border w3-small">
+        Service
+        <div class="w3-right">&times;</div>
+      </div>
+      <div id="service">
+        <div id="service_menu">
+          <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/new.png" style="width: 100%" /></button>
+          <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/open.png" style="width: 100%" /></button>
+          <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/save.png" style="width: 100%" /></button>
+        </div>
+        <div id="service_order" class="w3-white w3-border">New Service</div>
+        <div id="service_control">
+          <!-- <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/service_top.png" style="width: 100%" /></button>
+          <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/service_up.png" style="width: 100%" /></button>
+          <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/service_down.png" style="width: 100%" /></button>
+          <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/service_bottom.png" style="width: 100%" /></button>
+
+          <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/delete.png" style="width: 100%" /></button> -->
+
+          <button class="w3-button w3-hover-light-blue" onclick="service_items[selected_service].play();"><img class="w3-image" src="images/live.png" style="width: 100%" /></button>
+        </div>
+        <div id="instructions" class="w3-code w3-small">
+          <button class="w3-button w3-hover-red w3-right" onclick="document.getElementById('instructions').style='display: none;';">&times;</button>
+          1. Add your YouTube API key to the source code. Search will not work without it. <br />
+          2. Search for a video, by typing a phrase then hitting enter or clicking search. <br />
+          3. Add a video to the service by selecting the video and clicking the plus button or double clicking on the item. <br />
+          4. Wait for the video to load. A green progress bar will indicate this along with a spinning progress icon. If you see a Exclamation point in a triangle, your selected video has encountered an error. <br />
+          5. When the progress bar is full and the icon has changed to a tick, you can play the video by either selecting it and clicking the live button or by double clicking. <br />
+          6. The video can be stopped by clicking the stop button, blanking the screen or starting another video. 
+        </div>
+      </div>
+    </div>
+
+    <!-- PLAYER BLOCK -->
+    <div class="w3-main" style="margin: 0 20% 0 20%; width: 100%; height: 100%;">
+      <div id="screen" class="w3-black" style="width: 100%; height: 100%;"></div>
+      <div id="screen_control" class="w3-bottom w3-block w3-light-grey">
+        <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/slide_previous.png" style="width: 100%" /></button>
+        <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/slide_next.png" style="width: 100%" /></button>
+        <button class="w3-button w3-hover-light-blue" onclick="service_items[playing].stop();"><img class="w3-image" src="images/slide_blank.png" style="width: 100%" /></button>
+        <button class="w3-button w3-hover-grey w3-opacity-min" onclick=""><img class="w3-image" src="images/slide_desktop.png" style="width: 100%" /></button>
+        <button class="w3-button w3-hover-light-blue" onclick="service_items[playing].stop();"><img class="w3-image" src="images/media_playback_stop.png" style="width: 100%" /></button>
+      </div>
+    </div>
+  </body>
+</html>
